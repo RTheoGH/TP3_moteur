@@ -4,6 +4,8 @@
 #include <vector>
 #include <iostream>
 
+#include "scene.h"
+
 #define STB_IMAGE_IMPLEMENTATION
 #include "stb_image.h"
 
@@ -32,11 +34,11 @@ const unsigned int SCR_WIDTH = 800;
 const unsigned int SCR_HEIGHT = 600;
 
 // camera
-glm::vec3 camera_position   = glm::vec3(0.0f, 1.0f, 7.0f);
+glm::vec3 camera_position   = glm::vec3(0.0f, 0.0f, 3.0f);
 glm::vec3 camera_target = glm::vec3(0.0f, 0.0f, -1.0f);
 glm::vec3 camera_up    = glm::vec3(0.0f, 1.0f,  0.0f);
 
-glm::vec3 orbital_camera_position = glm::vec3(0.0f, 10.0f, 10.0f);
+// glm::vec3 orbital_camera_position = glm::vec3(0.0f, 10.0f, 10.0f);
 
 // timing
 float deltaTime = 0.0f;	// time between current frame and last frame
@@ -80,54 +82,6 @@ GLuint loadTexture(const char* filename) {
     }
     stbi_image_free(data);
     return textureID;
-}
-
-void scaleTerrain(std::vector<glm::vec3> &plan,std::vector<glm::vec2> &uvs,std::vector<unsigned short> &indices_plan,GLuint &vertexbuffer_plan,GLuint &uvbuffer,GLuint &elementbuffer_plan, int sommets) {
-    plan.clear();
-    uvs.clear();
-    indices_plan.clear();
-
-    float taille = 10.0f;
-    float m = taille / 2.0f;
-    float pas = taille / (float)sommets;
-
-    for (int i = 0; i <= sommets; i++) {
-        for (int j = 0; j <= sommets; j++) {
-            float x = -m + j * pas;
-            float z = -m + i * pas;
-            plan.emplace_back(glm::vec3(x,0.0f, z));
-
-            float u = (float)j / (float)(sommets - 1);
-            float v = (float)i / (float)(sommets - 1);
-            uvs.emplace_back(glm::vec2(u, v));
-        }
-    }
-
-    for (int i = 0; i < sommets-1; i++) {
-        for (int j = 0; j < sommets-1; j++) {
-            int topleft = i * (sommets + 1) + j;
-            int topright = topleft + 1;
-            int bottomleft = (i + 1) * (sommets + 1) + j;
-            int bottomright = bottomleft + 1;
-
-            indices_plan.push_back(topleft);
-            indices_plan.push_back(bottomleft);
-            indices_plan.push_back(topright);
-
-            indices_plan.push_back(topright);
-            indices_plan.push_back(bottomleft);
-            indices_plan.push_back(bottomright);
-        }
-    }
-
-    glBindBuffer(GL_ARRAY_BUFFER, vertexbuffer_plan);
-    glBufferData(GL_ARRAY_BUFFER, plan.size() * sizeof(glm::vec3), &plan[0], GL_STATIC_DRAW);
-
-    glBindBuffer(GL_ARRAY_BUFFER, uvbuffer);
-    glBufferData(GL_ARRAY_BUFFER, uvs.size() * sizeof(glm::vec2), &uvs[0], GL_STATIC_DRAW);
-
-    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, elementbuffer_plan);
-    glBufferData(GL_ELEMENT_ARRAY_BUFFER, indices_plan.size() * sizeof(unsigned short), &indices_plan[0] , GL_STATIC_DRAW);
 }
 
 int main( void ){
@@ -202,95 +156,34 @@ int main( void ){
     glUseProgram(programID);
     GLuint LightID = glGetUniformLocation(programID, "LightPosition_worldspace");
 
-    { // Textures
-        glActiveTexture(GL_TEXTURE0);
-        GLuint grassTexture = loadTexture("grass.png");
-        glBindTexture(GL_TEXTURE_2D,grassTexture);
-        GLuint grassTextureID = glGetUniformLocation(programID,"GRASS");
-        glUniform1i(grassTextureID, 0);
-        
-        glActiveTexture(GL_TEXTURE1);
-        GLuint rockTexture = loadTexture("rock.png");
-        glBindTexture(GL_TEXTURE_2D,rockTexture);
-        GLuint rockTextureID = glGetUniformLocation(programID,"ROCK");
-        glUniform1i(rockTextureID, 1);
+    // std::shared_ptr<SNode> racine = std::make_shared<SNode>();
+    auto soleil = std::make_shared<SNode>();
+    auto terre = std::make_shared<SNode>();
+    auto lune = std::make_shared<SNode>();
 
-        glActiveTexture(GL_TEXTURE2);
-        GLuint snowTexture = loadTexture("snowrocks.png");
-        glBindTexture(GL_TEXTURE_2D,snowTexture);
-        GLuint snowTextureID = glGetUniformLocation(programID,"SNOW");
-        glUniform1i(snowTextureID, 2);
+    terre->transform.position = glm::vec3(1.0f, 0.0f, 0.0f);
+    terre->transform.rotation.x = glm::radians(23.0f);
+    lune->transform.position = glm::vec3(1.5f, 0.0f, 0.0f);
 
-        glActiveTexture(GL_TEXTURE3);
-        GLuint heightmapTexture = loadTexture("heightmap-1024x1024.png");
-        glBindTexture(GL_TEXTURE_2D,heightmapTexture);
-        GLuint heightmapID = glGetUniformLocation(programID,"heightmap");
-        glUniform1i(heightmapID, 3);
+    terre->addFeuille(lune);
+    soleil->addFeuille(terre);
+    // racine->addFeuille(soleil);
 
-        GLuint heightScaleID = glGetUniformLocation(programID,"heightScale");
-        glUniform1f(heightScaleID,1.0f);
-    }
-    
-    std::vector<glm::vec3> plan;
-    std::vector<glm::vec2> uvs;
-    std::vector<unsigned short> indices_plan;
+    float time = 0.0f;
+    float terreRevSpeed = 0.5f;
+    float luneRevSpeed = 1.0f;
+    float terreRotaSpeed = 0.1f;
+    float luneRotaSpeed = 0.2f;
 
-    { // Initialisation du plan
-        float taille = 10.0f;
-        float m = taille / 2.0f;
-        float pas = taille / (float)sommets;
-    
-        for(int i = 0; i <= sommets; i++){
-            for(int j = 0; j <= sommets; j++){
-                float x = -m + j * pas;
-                float z = -m + i * pas;
-    
-                plan.emplace_back(glm::vec3(x,0.0f,z));
-    
-                float u = (float)j / (float)(sommets-1);
-                float v = (float)i / (float)(sommets-1);
-    
-                uvs.emplace_back(glm::vec2(u,v));
-            }
-        }
-    
-        for(int i = 0; i < sommets-1; i++){
-            for(int j = 0; j < sommets-1; j++){
-                int topleft = i * (sommets+1) + j;
-                int topright = topleft + 1;
-                int bottomleft = (i+1) * (sommets+1) + j;
-                int bottomright = bottomleft + 1;
-    
-                indices_plan.push_back(topleft);
-                indices_plan.push_back(bottomleft);
-                indices_plan.push_back(topright);
-    
-                indices_plan.push_back(topright);
-                indices_plan.push_back(bottomleft);
-                indices_plan.push_back(bottomright);
-            }
-        }
-    }
-    
-    GLuint vertexbuffer_plan,uvbuffer,elementbuffer_plan;
-    
-    glGenBuffers(1,&vertexbuffer_plan);
-    glBindBuffer(GL_ARRAY_BUFFER,vertexbuffer_plan);
-    glBufferData(GL_ARRAY_BUFFER,plan.size() * sizeof(glm::vec3),&plan[0],GL_STATIC_DRAW);
-
-    glGenBuffers(1,&uvbuffer);
-    glBindBuffer(GL_ARRAY_BUFFER,uvbuffer);
-    glBufferData(GL_ARRAY_BUFFER,uvs.size() * sizeof(glm::vec2),&uvs[0],GL_STATIC_DRAW);
-
-    glGenBuffers(1,&elementbuffer_plan);
-    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER,elementbuffer_plan);
-    glBufferData(GL_ELEMENT_ARRAY_BUFFER,indices_plan.size() * sizeof(unsigned short),&indices_plan[0],GL_STATIC_DRAW);
+    glm::mat4 initialMatrix = glm::mat4(1.0f);
+    glm::vec3 initialPos = glm::vec3(0.0f,0.0f,0.0f);
 
     // For speed computation
     double lastTime = glfwGetTime();
     int nbFrames = 0;
 
     do{
+        time += deltaTime;
         // Measure speed
         // per-frame time logic
         // --------------------
@@ -302,57 +195,41 @@ int main( void ){
         // -----
         processInput(window);
 
-        // Mise à jour de la résolution
-        // --------------------
-        if(scaleT){
-            scaleTerrain(plan,uvs,indices_plan,vertexbuffer_plan,uvbuffer,elementbuffer_plan,sommets);
-            scaleT = false;
-        }
+        terre->transform.rotation.y = time * terreRevSpeed;
+        terre->transform.rotation.z += terreRotaSpeed * deltaTime;
 
-        // Rotation mode orbital
-        // --------------------
-        if(orbital){
-            angle += rotation_speed * deltaTime ;
-        }
+        lune->transform.rotation.y = time * luneRevSpeed;
+        lune->transform.rotation.z += luneRotaSpeed * deltaTime;
+
+        soleil->update(deltaTime);
 
         // Clear the screen
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
+        soleil->draw(programID,initialMatrix,initialPos);
+
         // Use our shader
         glUseProgram(programID);
 
-
         /****************************************/
-        // Model matrix : an identity matrix (model will be at the origin) then change
-        glm::mat4 ModelMatrix;
-        if(orbital){
-            ModelMatrix = glm::rotate(glm::mat4(1.0f),angle,glm::vec3(0.0f,1.0f,0.0f));
-        }else{
-            ModelMatrix = glm::mat4(1.0f);
-        }
-        // View matrix : camera/view transformation lookat() utiliser camera_position camera_target camera_up
-        glm::mat4 ViewMatrix = glm::lookAt(camera_position,camera_position+camera_target,camera_up);
-        // Projection matrix : 45 Field of View, 4:3 ratio, display range : 0.1 unit <-> 100 units
-        glm::mat4 ProjectionMatrix = glm::perspective(glm::radians(angle_perspective),(float)SCR_WIDTH / (float)SCR_HEIGHT,0.1f,100.0f);
-        // Send our transformation to the currently bound shader,
-        // in the "Model View Projection" to the shader uniforms
+        glm::mat4 ModelMatrix = glm::mat4(1.0f);
+        glm::mat4 ViewMatrix = glm::lookAt(
+            camera_position,
+            camera_position+camera_target,
+            camera_up
+        );
+        glm::mat4 ProjectionMatrix = glm::perspective(
+            glm::radians(angle_perspective),
+            (float)SCR_WIDTH / (float)SCR_HEIGHT,
+            0.1f,
+            100.0f
+        );
+
         MVP = ProjectionMatrix*ViewMatrix*ModelMatrix;
         glUniformMatrix4fv(MatrixID,1,GL_FALSE,&MVP[0][0]);
         /****************************************/
 
-        glEnableVertexAttribArray(0);
-        glBindBuffer(GL_ARRAY_BUFFER,vertexbuffer_plan);
-        glVertexAttribPointer(0,3,GL_FLOAT, GL_FALSE,0,(void*)0);
-
-        glEnableVertexAttribArray(1);
-        glBindBuffer(GL_ARRAY_BUFFER,uvbuffer);
-        glVertexAttribPointer(1,2,GL_FLOAT,GL_FALSE,0,(void*)0);
-
-        glBindBuffer(GL_ELEMENT_ARRAY_BUFFER,elementbuffer_plan);
-        glDrawElements(GL_TRIANGLES,indices_plan.size(),GL_UNSIGNED_SHORT,(void*)0);
-
-        glDisableVertexAttribArray(0);
-        glDisableVertexAttribArray(1);
+        
 
         // Swap buffers
         glfwSwapBuffers(window);
@@ -363,9 +240,9 @@ int main( void ){
            glfwWindowShouldClose(window) == 0 );
 
     // Cleanup VBO and shader
-    glDeleteBuffers(1,&vertexbuffer_plan);
-    glDeleteBuffers(1,&elementbuffer_plan);
-    glDeleteBuffers(1,&uvbuffer);
+    // glDeleteBuffers(1,&vertexbuffer_plan);
+    // glDeleteBuffers(1,&elementbuffer_plan);
+    // glDeleteBuffers(1,&uvbuffer);
     glDeleteProgram(programID);
     glDeleteVertexArrays(1,&VertexArrayID);
 
@@ -382,69 +259,31 @@ void processInput(GLFWwindow *window){
     if (glfwGetKey(window, GLFW_KEY_ESCAPE) == GLFW_PRESS)
         glfwSetWindowShouldClose(window, true);
 
-    if(!orbital){
-        float cameraSpeed = 2.5 * deltaTime;
-        if(glfwGetKey(window, GLFW_KEY_Z) == GLFW_PRESS)
-            camera_position += cameraSpeed * camera_target;
-        if(glfwGetKey(window, GLFW_KEY_X) == GLFW_PRESS)
-            camera_position -= cameraSpeed * camera_target;
-
-        if(glfwGetKey(window,GLFW_KEY_A) == GLFW_PRESS)
-            camera_position -= glm::normalize(glm::cross(camera_target,camera_up))*cameraSpeed;
-        if(glfwGetKey(window,GLFW_KEY_W) == GLFW_PRESS)
-            camera_position += cameraSpeed * camera_up;
-        if(glfwGetKey(window,GLFW_KEY_D) == GLFW_PRESS)
-            camera_position += glm::normalize(glm::cross(camera_target,camera_up))*cameraSpeed;
-        if(glfwGetKey(window,GLFW_KEY_S) == GLFW_PRESS)
-            camera_position -= cameraSpeed * camera_up;
-    }else{
-        camera_position = orbital_camera_position;
-        camera_target = glm::normalize(camera_target - orbital_camera_position);
+    float cameraSpeed = 2.5 * deltaTime;
+    if(glfwGetKey(window, GLFW_KEY_Z) == GLFW_PRESS){
+        camera_position += cameraSpeed * camera_target;
+        std::cout << "forward" << std::endl;
     }
-
-    /****************************************/
-    // Augmenter ou diminuer la résolution du plan
-
-    if(glfwGetKey(window, GLFW_KEY_U) == GLFW_PRESS && sommets <= MAX_SOMMETS){
-        sommets += 2;
-        scaleT = true;
+    if(glfwGetKey(window, GLFW_KEY_X) == GLFW_PRESS){
+        camera_position -= cameraSpeed * camera_target;
+        std::cout << "backward" << std::endl;
     }
-    if(glfwGetKey(window, GLFW_KEY_J) == GLFW_PRESS && sommets > MIN_SOMMETS){
-        sommets -= 2;
-        scaleT = true;
+    if(glfwGetKey(window,GLFW_KEY_A) == GLFW_PRESS){
+        camera_position -= glm::normalize(glm::cross(camera_target,camera_up))*cameraSpeed;
+        std::cout << "gauche" << std::endl;
     }
-
-    /****************************************/
-    // Angle de perspective
-
-    if(glfwGetKey(window, GLFW_KEY_B) == GLFW_PRESS)
-        angle_perspective += 1.0f;
-    if(glfwGetKey(window, GLFW_KEY_N) == GLFW_PRESS)
-        angle_perspective -= 1.0f;
-
-    /****************************************/
-    // Vitesse de rotation (mode orbital)
-
-    if(glfwGetKey(window, GLFW_KEY_UP) == GLFW_PRESS)
-        rotation_speed += 0.1f;
-    if(glfwGetKey(window, GLFW_KEY_DOWN) == GLFW_PRESS)
-        rotation_speed -= 0.1f;
-
-    /****************************************/
-    // Position de la caméra selon le mode (manuel ou orbital)
-
-    if(glfwGetKey(window, GLFW_KEY_C) == GLFW_PRESS){
-        orbital = !orbital;
-        if(orbital){
-            camera_position = orbital_camera_position;
-            camera_target = glm::normalize(camera_target - orbital_camera_position);
-        }
-        if(!orbital){
-            camera_position   = glm::vec3(0.0f,1.0f,7.0f);
-            camera_target = glm::vec3(0.0f,0.0f,-1.0f);
-        }
+    if(glfwGetKey(window,GLFW_KEY_W) == GLFW_PRESS){
+        camera_position += cameraSpeed * camera_up;
+        std::cout << "haut" << std::endl;
     }
-
+    if(glfwGetKey(window,GLFW_KEY_D) == GLFW_PRESS){
+        camera_position += glm::normalize(glm::cross(camera_target,camera_up))*cameraSpeed;
+        std::cout << "droite" << std::endl;
+    }
+    if(glfwGetKey(window,GLFW_KEY_S) == GLFW_PRESS){
+        camera_position -= cameraSpeed * camera_up;
+        std::cout << "bas" << std::endl;
+    }
     /****************************************/
 }
 

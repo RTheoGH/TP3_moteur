@@ -5,30 +5,14 @@ in vec2 UV;
 out vec3 color;
 
 uniform sampler2D texture1;
-uniform vec3 objColor;
-
-// uniform sampler2D GRASS;
-// uniform sampler2D ROCK;
-// uniform sampler2D SNOW;
-
-// in float altitude;
+// uniform vec3 objColor;
 
 void main(){
-        // vec3 grassColor = texture(GRASS,UV).rgb;
-        // vec3 rockColor = texture(ROCK,UV).rgb;
-        // vec3 snowColor = texture(SNOW,UV).rgb;
 
-        // vec3 blendedColor = mix(grassColor,rockColor,smoothstep(0.15,0.25,altitude));
-        // blendedColor = mix(blendedColor,snowColor,smoothstep(0.3,0.5,altitude));
-
-        // color = blendedColor;
-        color = objColor;
-
+        color = texture(texture1,UV).rgb;
+        
         // DEBUG
+        // color = objColor;
         // color =vec3(0.4,0.2,0.2);
-        // color = texture(texture1,UV).rgb;
         // color =vec3(UV,1.0);
-        // color = texture(GRASS,UV).rgb;
-        // color = texture(ROCK,UV).rgb;
-        // color = texture(SNOW,UV).rgb;
 }

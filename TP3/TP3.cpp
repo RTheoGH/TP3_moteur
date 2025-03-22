@@ -74,7 +74,10 @@ GLuint loadTexture(const char* filename) {
     if (data) {
         glBindTexture(GL_TEXTURE_2D, textureID);
 
-        GLenum format = (nrChannels == 4) ? GL_RGBA : GL_RGB;
+        GLenum format = GL_RGB;
+        if (nrChannels == 1) format = GL_RED;
+        else if (nrChannels == 3) format = GL_RGB;
+        else if (nrChannels == 4) format = GL_RGBA;
         glTexImage2D(GL_TEXTURE_2D, 0, format, width, height, 0, format, GL_UNSIGNED_BYTE, data);
         glGenerateMipmap(GL_TEXTURE_2D);
 
@@ -93,21 +96,15 @@ GLuint loadTexture(const char* filename) {
 void calculateUVSphere(std::vector<glm::vec3>& vertices, std::vector<glm::vec2>& uvs) {
     uvs.clear();
     for (const auto& vertex : vertices) {
-        // Calculer les angles theta et phi
         float theta = atan2(vertex.z, vertex.x);
-        float phi = acos(vertex.y);
+        float phi = acos(vertex.y / glm::length(vertex));
 
-        // Calculer les coordonnées UV
-        float u = (theta + M_PI) / (2.0f * M_PI); // Normaliser entre 0 et 1
-        float v = phi / M_PI; // Normaliser entre 0 et 1
+        float u = (theta + M_PI) / (2.0f * M_PI);
+        float v = phi / M_PI;
 
         uvs.push_back(glm::vec2(u, v));
     }
 }
-
-// GLuint soleilTexture = loadTexture("textures/soleil.png");
-// GLuint terreTexture = loadTexture("textures/Terre.png");
-// GLuint luneTexture = loadTexture("textures/lune.png");
 
 
 class Transform{
@@ -134,16 +131,18 @@ public:
     std::vector<std::shared_ptr<SNode>> feuilles;
     GLuint vao,vbo,ibo,textureID;
     size_t indexCPT;
-    glm::vec3 color; // vu que j'arrive pas a faire marcher les textures (encore)
+    // glm::vec3 color;
 
     SNode(const char* texturePath) {
         buffers();
         textureID = loadTexture(texturePath);
     }
 
-    SNode(glm::vec3 nodeColor) : color(nodeColor) {
-        buffers();
-    }
+    // SNode(glm::vec3 nodeColor) : color(nodeColor) {
+    //     buffers();
+    // }
+
+    SNode(){}
 
     void buffers() {
 
@@ -151,7 +150,7 @@ public:
         std::vector<glm::vec2> uvs;
         std::vector<unsigned short> indices;
         std::vector<std::vector<unsigned short>> triangles;
-        loadOFF("sphere2.off",vertices,indices,triangles);
+        loadOFF("modeles/sphere2.off",vertices,indices,triangles);
 
         calculateUVSphere(vertices, uvs);
 
@@ -165,11 +164,15 @@ public:
         glEnableVertexAttribArray(0);
 
         GLuint uvVBO;
-        glGenBuffers(1, &uvVBO);
-        glBindBuffer(GL_ARRAY_BUFFER, uvVBO);
-        glBufferData(GL_ARRAY_BUFFER, uvs.size() * sizeof(glm::vec2), &uvs[0], GL_STATIC_DRAW);
-        glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, sizeof(glm::vec2), (void*)0);
-        glEnableVertexAttribArray(1);
+        if (uvs.empty()) {
+            std::cerr << "Erreur : UVs non générés pour le modèle" << std::endl;
+        } else {
+            glGenBuffers(1, &uvVBO);
+            glBindBuffer(GL_ARRAY_BUFFER, uvVBO);
+            glBufferData(GL_ARRAY_BUFFER, uvs.size() * sizeof(glm::vec2), &uvs[0], GL_STATIC_DRAW);
+            glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, sizeof(glm::vec2), (void*)0);
+            glEnableVertexAttribArray(1);
+        }
 
         glGenBuffers(1, &ibo);
         glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, ibo);
@@ -203,12 +206,16 @@ public:
         MVP = ProjectionMatrix*ViewMatrix*ModelMatrix;
         glUniformMatrix4fv(MatrixID,1,GL_FALSE,&MVP[0][0]);
 
-        GLuint colorLocation = glGetUniformLocation(shaderProgram, "objColor");
-        glUniform3fv(colorLocation, 1, &color[0]);
+        // GLuint colorLocation = glGetUniformLocation(shaderProgram, "objColor");
+        // glUniform3fv(colorLocation, 1, &color[0]);
 
         glActiveTexture(GL_TEXTURE0);
         glBindTexture(GL_TEXTURE_2D, textureID);
-        glUniform1i(glGetUniformLocation(shaderProgram, "texture1"), 0);
+        GLuint textureLocation = glGetUniformLocation(shaderProgram, "texture1");
+        if(textureLocation == -1){
+            std::cerr << "Erreur : Uniform texture1 introuvable" << std::endl;
+        }
+        glUniform1i(textureLocation, 0);
 
         glBindVertexArray(vao);
         glEnableVertexAttribArray(0);
@@ -238,7 +245,8 @@ class Scene{
 public:
     std::shared_ptr<SNode> racine;
 
-    Scene(){racine = std::make_shared<SNode>(glm::vec3(1.0f, 1.0f, 1.0f));}
+    // Scene(){racine = std::make_shared<SNode>(glm::vec3(1.0f, 1.0f, 1.0f));}
+    Scene(){racine = std::make_shared<SNode>();}
 
     void update(float deltaTime){
         racine->update(deltaTime);
@@ -327,13 +335,14 @@ int main( void ){
 
     std::shared_ptr<Scene> scene = std::make_shared<Scene>();
 
-    // std::shared_ptr<SNode> soleil = std::make_shared<SNode>("textures/soleil.png");
-    // std::shared_ptr<SNode> terre = std::make_shared<SNode>("textures/Terre.png");
-    // std::shared_ptr<SNode> lune = std::make_shared<SNode>("textures/lune.png");
+    std::shared_ptr<SNode> soleil = std::make_shared<SNode>("textures/s2.png");
+    std::shared_ptr<SNode> terre = std::make_shared<SNode>("textures/s1.png");
+    std::shared_ptr<SNode> lune = std::make_shared<SNode>("textures/s3.png");
 
-    std::shared_ptr<SNode> soleil = std::make_shared<SNode>(glm::vec3(1.0f, 0.5f, 0.0f));
-    std::shared_ptr<SNode> terre = std::make_shared<SNode>(glm::vec3(0.0f, 0.5f, 1.0f));
-    std::shared_ptr<SNode> lune = std::make_shared<SNode>(glm::vec3(0.5f, 0.5f, 0.5f));
+    // version couleur (sans texture)
+    // std::shared_ptr<SNode> soleil = std::make_shared<SNode>(glm::vec3(1.0f, 0.5f, 0.0f));
+    // std::shared_ptr<SNode> terre = std::make_shared<SNode>(glm::vec3(0.0f, 0.5f, 1.0f));
+    // std::shared_ptr<SNode> lune = std::make_shared<SNode>(glm::vec3(0.5f, 0.5f, 0.5f));
 
     terre->transform.scale = glm::vec3(0.4f);
     terre->transform.position = glm::vec3(3.0f, 0.0f, 0.0f);

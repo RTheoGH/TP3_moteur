@@ -93,9 +93,9 @@ GLuint loadTexture(const char* filename) {
     return textureID;
 }
 
-void calculateUVSphere(std::vector<glm::vec3>& vertices, std::vector<glm::vec2>& uvs) {
+void calculateUVSphere(std::vector<glm::vec3>& vertices,std::vector<glm::vec2>& uvs){
     uvs.clear();
-    for (const auto& vertex : vertices) {
+    for(const auto& vertex : vertices){
         float theta = atan2(vertex.z, vertex.x);
         float phi = acos(vertex.y / glm::length(vertex));
 
@@ -106,6 +106,7 @@ void calculateUVSphere(std::vector<glm::vec3>& vertices, std::vector<glm::vec2>&
     }
 }
 
+/*******************************************************************************/
 
 class Transform{
 public:
@@ -138,6 +139,7 @@ public:
         textureID = loadTexture(texturePath);
     }
 
+    // Ancienne version sans texture (couleur)
     // SNode(glm::vec3 nodeColor) : color(nodeColor) {
     //     buffers();
     // }
@@ -164,15 +166,11 @@ public:
         glEnableVertexAttribArray(0);
 
         GLuint uvVBO;
-        if (uvs.empty()) {
-            std::cerr << "Erreur : UVs non générés pour le modèle" << std::endl;
-        } else {
-            glGenBuffers(1, &uvVBO);
-            glBindBuffer(GL_ARRAY_BUFFER, uvVBO);
-            glBufferData(GL_ARRAY_BUFFER, uvs.size() * sizeof(glm::vec2), &uvs[0], GL_STATIC_DRAW);
-            glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, sizeof(glm::vec2), (void*)0);
-            glEnableVertexAttribArray(1);
-        }
+        glGenBuffers(1, &uvVBO);
+        glBindBuffer(GL_ARRAY_BUFFER, uvVBO);
+        glBufferData(GL_ARRAY_BUFFER, uvs.size() * sizeof(glm::vec2), &uvs[0], GL_STATIC_DRAW);
+        glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, sizeof(glm::vec2), (void*)0);
+        glEnableVertexAttribArray(1);
 
         glGenBuffers(1, &ibo);
         glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, ibo);
@@ -206,6 +204,7 @@ public:
         MVP = ProjectionMatrix*ViewMatrix*ModelMatrix;
         glUniformMatrix4fv(MatrixID,1,GL_FALSE,&MVP[0][0]);
 
+        // Ancienne version sans texture (couleur)
         // GLuint colorLocation = glGetUniformLocation(shaderProgram, "objColor");
         // glUniform3fv(colorLocation, 1, &color[0]);
 
@@ -245,7 +244,6 @@ class Scene{
 public:
     std::shared_ptr<SNode> racine;
 
-    // Scene(){racine = std::make_shared<SNode>(glm::vec3(1.0f, 1.0f, 1.0f));}
     Scene(){racine = std::make_shared<SNode>();}
 
     void update(float deltaTime){
@@ -258,8 +256,6 @@ public:
 };
 
 /*******************************************************************************/
-
-
 
 int main( void ){
     // Initialise GLFW
@@ -434,7 +430,6 @@ int main( void ){
 
     return 0;
 }
-
 
 // process all input: query GLFW whether relevant keys are pressed/released this frame and react accordingly
 // ---------------------------------------------------------------------------------------------------------
